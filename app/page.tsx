@@ -1,95 +1,523 @@
-'use client';
+"use client";
 
-import { useChat } from '@ai-sdk/react';
-import { useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { CheckCheck, Copy, LoaderCircle, Plus, RefreshCw, Save, Sparkles, WandSparkles } from "lucide-react";
+import { Toaster, toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { USER_STYLE_SAMPLE, type StyleTweet } from "@/lib/style-engine";
+import { cn } from "@/lib/utils";
 
-export default function Chat() {
-  const [input, setInput] = useState('');
-  const { messages, sendMessage, status } = useChat();
-  const isLoading = status === 'streaming' || status === 'submitted';
+type TweetDraft = {
+  id: string;
+  text: string;
+  rationale: string;
+  charCount: number;
+};
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-    sendMessage({ text: input });
-    setInput('');
+type Feed = {
+  id: string;
+  name: string;
+  url: string;
+  category: string;
+};
+
+type FeedEntry = {
+  id?: string;
+  title: string;
+  link: string;
+  decodedUrl?: string;
+  canonicalUrl?: string;
+  publishedAt: string;
+  summary: string;
+  relevanceScore?: number;
+  nicheTopics?: string[];
+};
+
+const STARTER_PROMPTS = [
+  "A quick opinion on why consistency beats motivation",
+  "A short tweet about learning from failed experiments",
+  "A personal note on shipping before perfecting",
+  "A clean tweet about building with AI tools daily",
+];
+
+export default function Page() {
+  const [prompt, setPrompt] = useState("");
+  const [styleTweets, setStyleTweets] = useState<StyleTweet[]>(USER_STYLE_SAMPLE);
+  const [feeds, setFeeds] = useState<Feed[]>([]);
+  const [selectedFeedId, setSelectedFeedId] = useState<string>("");
+  const [tweets, setTweets] = useState<TweetDraft[]>([]);
+  const [sourceEntries, setSourceEntries] = useState<FeedEntry[]>([]);
+  const [isLoadingManual, setIsLoadingManual] = useState(false);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(false);
+  const [isSavingStyle, setIsSavingStyle] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const canGenerateManual = prompt.trim().length >= 5 && !isLoadingManual;
+  const canGenerateFeed = selectedFeedId.length > 0 && !isLoadingFeed;
+
+  const styleTweetCount = useMemo(
+    () => styleTweets.filter((tweet) => tweet.tweet.trim().length > 0).length,
+    [styleTweets],
+  );
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      try {
+        const [styleRes, feedRes] = await Promise.all([
+          fetch("/api/style"),
+          fetch("/api/feeds"),
+        ]);
+
+        if (styleRes.ok) {
+          const stylePayload = await styleRes.json();
+          if (Array.isArray(stylePayload?.tweets) && stylePayload.tweets.length > 0) {
+            setStyleTweets(stylePayload.tweets);
+          }
+        }
+
+        if (feedRes.ok) {
+          const feedPayload = await feedRes.json();
+          const nextFeeds = (feedPayload?.feeds as Feed[] | undefined) ?? [];
+          setFeeds(nextFeeds);
+          if (nextFeeds[0]?.id) {
+            setSelectedFeedId(nextFeeds[0].id);
+          }
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error("Failed to load initial data.");
+      }
+    };
+
+    void bootstrap();
+  }, []);
+
+  const saveStyle = async () => {
+    const validTweets = styleTweets
+      .map((tweet, index) => ({ id: index + 1, tweet: tweet.tweet.trim() }))
+      .filter((tweet) => tweet.tweet.length > 0);
+
+    if (validTweets.length < 3) {
+      toast.error("Add at least 3 style tweets before saving.");
+      return;
+    }
+
+    setIsSavingStyle(true);
+
+    try {
+      const response = await fetch("/api/style", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tweets: validTweets }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to save style.");
+      }
+
+      if (Array.isArray(payload?.tweets)) {
+        setStyleTweets(payload.tweets);
+      }
+      toast.success("Style profile saved.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Style save failed.";
+      toast.error(message);
+    } finally {
+      setIsSavingStyle(false);
+    }
+  };
+
+  const generateManualTweets = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canGenerateManual) {
+      return;
+    }
+
+    setIsLoadingManual(true);
+    setTweets([]);
+    setSourceEntries([]);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Generation failed.");
+      }
+
+      const nextTweets = (payload?.tweets as TweetDraft[] | undefined) ?? [];
+      if (nextTweets.length !== 3) {
+        throw new Error("The model did not return 3 tweets. Please retry.");
+      }
+
+      setTweets(nextTweets);
+      toast.success("Generated 3 tweet drafts.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Request failed.";
+      toast.error(message);
+    } finally {
+      setIsLoadingManual(false);
+    }
+  };
+
+  const generateFromFeed = async () => {
+    if (!canGenerateFeed) {
+      return;
+    }
+
+    setIsLoadingFeed(true);
+    setTweets([]);
+    setSourceEntries([]);
+
+    try {
+      const response = await fetch("/api/generate-from-feed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedId: selectedFeedId }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Feed generation failed.");
+      }
+
+      const nextTweets = (payload?.tweets as TweetDraft[] | undefined) ?? [];
+      if (nextTweets.length !== 3) {
+        throw new Error("The model did not return 3 tweets. Please retry.");
+      }
+
+      setTweets(nextTweets);
+      setSourceEntries((payload?.sourceEntries as FeedEntry[] | undefined) ?? []);
+      toast.success("Generated 3 tweets from RSS feed.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Feed request failed.";
+      toast.error(message);
+    } finally {
+      setIsLoadingFeed(false);
+    }
+  };
+
+  const copyTweet = async (tweet: TweetDraft) => {
+    await navigator.clipboard.writeText(tweet.text);
+    setCopiedId(tweet.id);
+    toast.success("Tweet copied.");
+    window.setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  const addStyleTweet = () => {
+    setStyleTweets((prev) => [...prev, { id: prev.length + 1, tweet: "" }]);
+  };
+
+  const updateStyleTweet = (id: number, tweet: string) => {
+    setStyleTweets((prev) => prev.map((item) => (item.id === id ? { ...item, tweet } : item)));
+  };
+
+  const removeStyleTweet = (id: number) => {
+    setStyleTweets((prev) =>
+      prev
+        .filter((item) => item.id !== id)
+        .map((item, index) => ({ ...item, id: index + 1 })),
+    );
   };
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-50 dark:bg-zinc-950">
-      <header className="flex items-center justify-center px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Qwen3.5 Chatbot
-        </h1>
-      </header>
+    <main className="flex-1 bg-[radial-gradient(100%_90%_at_50%_0%,oklch(0.96_0.03_188),transparent_60%),radial-gradient(90%_80%_at_100%_100%,oklch(0.93_0.03_90),transparent_65%)]">
+      <Toaster position="top-center" richColors closeButton />
 
-      <main className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-2xl mx-auto space-y-4">
-          {messages.length === 0 && (
-            <div className="flex items-center justify-center h-full text-zinc-500 dark:text-zinc-400">
-              <p>Start a conversation by typing a message below.</p>
-            </div>
-          )}
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              }`}
-            >
-              <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white rounded-br-md'
-                    : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-bl-md'
-                }`}
-              >
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {message.parts.map((part, i) => {
-                    if (part.type === 'text') {
-                      return <span key={i}>{part.text}</span>;
-                    }
-                    return null;
-                  })}
-                </div>
-              </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-zinc-200 dark:bg-zinc-800 rounded-2xl rounded-bl-md px-4 py-3">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        {/* Hero Section */}
+        <section className="mb-6 sm:mb-8">
+          <Badge className="mb-3 gap-1 rounded-full bg-primary/12 text-primary ring-1 ring-primary/20">
+            <Sparkles className="size-3.5" />
+            Dynamic Style + RSS Engine
+          </Badge>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
+            Tech News to Viral Hook Tweets
+          </h1>
+          <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground sm:mt-2">
+            Generate in two ways: custom prompt or selected RSS feed. Both use your saved writing style.
+          </p>
+        </section>
 
-      <footer className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
-        <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-              disabled={isLoading}
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white font-medium rounded-full transition-colors"
-            >
-              Send
-            </button>
+        <Separator className="mb-6 sm:mb-8" />
+
+        {/* Workspace + Style — stacks on mobile, side-by-side on lg */}
+        <section className="grid gap-5 sm:gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          {/* Generation Workspace */}
+          <Card className="rounded-2xl border border-border/60 bg-card/85 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle>Generation Workspace</CardTitle>
+              <CardDescription>Write a prompt or pick an RSS feed to generate tweets.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="manual">
+                <TabsList className="w-full rounded-xl bg-muted/50">
+                  <TabsTrigger value="manual">Manual Prompt</TabsTrigger>
+                  <TabsTrigger value="rss">RSS Feed</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="manual" className="mt-4">
+                  <form onSubmit={generateManualTweets} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="tweet-request">What should the tweets be about?</Label>
+                      <Textarea
+                        id="tweet-request"
+                        value={prompt}
+                        onChange={(event) => setPrompt(event.target.value)}
+                        placeholder="Example: Tweet about why async processing improved our API reliability in plain language."
+                        className="min-h-28 rounded-xl border-border/70 bg-background/70 text-sm"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {STARTER_PROMPTS.map((starter) => (
+                        <button
+                          key={starter}
+                          type="button"
+                          onClick={() => setPrompt(starter)}
+                          className="rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:scale-[0.97]"
+                        >
+                          {starter}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs text-muted-foreground">{prompt.trim().length} chars</p>
+                      <Button type="submit" disabled={!canGenerateManual} className="h-10 rounded-xl px-5 sm:h-9">
+                        {isLoadingManual ? (
+                          <>
+                            <LoaderCircle className="size-4 animate-spin" />
+                            Generating
+                          </>
+                        ) : (
+                          <>
+                            <WandSparkles className="size-4" />
+                            Generate 3 Tweets
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </TabsContent>
+
+                <TabsContent value="rss" className="mt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Select RSS Feed</Label>
+                    <Select value={selectedFeedId} onValueChange={setSelectedFeedId}>
+                      <SelectTrigger className="h-11 w-full rounded-xl border-border/70 bg-background/70 sm:h-10">
+                        <SelectValue placeholder="Choose a feed" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {feeds.map((feed) => (
+                          <SelectItem key={feed.id} value={feed.id}>
+                            {feed.name} ({feed.category})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button
+                    type="button"
+                    disabled={!canGenerateFeed}
+                    onClick={generateFromFeed}
+                    className="h-10 w-full rounded-xl sm:h-9"
+                  >
+                    {isLoadingFeed ? (
+                      <>
+                        <LoaderCircle className="size-4 animate-spin" />
+                        Fetching + Generating
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="size-4" />
+                        Generate From Feed
+                      </>
+                    )}
+                  </Button>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* Saved Writing Style */}
+          <Card className="rounded-2xl border border-border/60 bg-card/85 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle>Saved Writing Style</CardTitle>
+              <CardDescription>Keep at least 3 samples. This style is used in both tabs.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="max-h-[340px] space-y-3 overflow-y-auto pr-1 sm:max-h-[380px]">
+                {styleTweets.map((item, index) => (
+                  <div key={item.id} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Style Tweet {index + 1}</Label>
+                      <button
+                        type="button"
+                        onClick={() => removeStyleTweet(item.id)}
+                        className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        disabled={styleTweets.length <= 3}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <Textarea
+                      value={item.tweet}
+                      onChange={(event) => updateStyleTweet(item.id, event.target.value)}
+                      className="min-h-20 rounded-xl border-border/70 bg-background/70 text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col gap-3">
+              <div className="flex w-full items-center justify-between">
+                <p className="text-xs text-muted-foreground">{styleTweetCount} valid samples</p>
+                <Button type="button" variant="outline" size="sm" onClick={addStyleTweet} className="rounded-lg">
+                  <Plus className="size-4" />
+                  Add
+                </Button>
+              </div>
+              <Button type="button" onClick={saveStyle} disabled={isSavingStyle} className="h-10 w-full rounded-xl sm:h-9">
+                {isSavingStyle ? (
+                  <>
+                    <LoaderCircle className="size-4 animate-spin" />
+                    Saving
+                  </>
+                ) : (
+                  <>
+                    <Save className="size-4" />
+                    Save Style
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </section>
+
+        {/* Generated Tweets */}
+        <section className="mt-8 sm:mt-10">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-heading text-lg font-semibold sm:text-xl">Generated Tweets</h2>
+            {tweets.length > 0 && (
+              <Button variant="outline" onClick={() => setTweets([])} className="rounded-lg text-xs">
+                Clear
+              </Button>
+            )}
           </div>
-        </form>
-      </footer>
-    </div>
+
+          {(isLoadingManual || isLoadingFeed) && (
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+              {[0, 1, 2].map((index) => (
+                <div key={index} className="h-56 animate-pulse rounded-2xl border border-border/60 bg-card/60" />
+              ))}
+            </div>
+          )}
+
+          {!isLoadingManual && !isLoadingFeed && tweets.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-border/70 bg-background/60 px-4 py-10 text-center sm:px-6 sm:py-12">
+              <p className="text-sm text-muted-foreground">
+                Generate from prompt or RSS feed to see three tweet drafts.
+              </p>
+            </div>
+          )}
+
+          {!isLoadingManual && !isLoadingFeed && tweets.length > 0 && (
+            <div className="space-y-4 sm:space-y-5">
+              {sourceEntries.length > 0 && (
+                <Card className="rounded-2xl border border-border/60 bg-card/90">
+                  <CardHeader>
+                    <CardTitle>RSS Context Used</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {sourceEntries.map((entry) => (
+                      <a
+                        key={entry.id ?? entry.link}
+                        href={entry.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block rounded-lg border border-border/60 px-3 py-2.5 text-xs transition-colors hover:bg-muted/40 active:bg-muted/60"
+                      >
+                        <p className="font-medium text-foreground">{entry.title}</p>
+                        <p className="text-muted-foreground">{entry.publishedAt || "Unknown date"}</p>
+                        {entry.nicheTopics && entry.nicheTopics.length > 0 && (
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            Topics: {entry.nicheTopics.join(", ")}
+                          </p>
+                        )}
+                        {entry.canonicalUrl && (
+                          <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                            Canonical: {entry.canonicalUrl}
+                          </p>
+                        )}
+                      </a>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                {tweets.map((tweet, index) => (
+                  <Card
+                    key={tweet.id}
+                    className={cn(
+                      "rounded-2xl border border-border/60 bg-card/90 transition-transform",
+                      "hover:-translate-y-0.5 active:translate-y-0",
+                    )}
+                  >
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center justify-between">
+                        <span>Draft {index + 1}</span>
+                        <Badge variant="outline" className="rounded-full">
+                          {tweet.charCount}/280
+                        </Badge>
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground">{tweet.rationale}</p>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{tweet.text}</p>
+                    </CardContent>
+                    <CardFooter className="justify-end border-t border-border/60">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyTweet(tweet)}
+                        className="h-9 rounded-lg px-4"
+                      >
+                        {copiedId === tweet.id ? (
+                          <>
+                            <CheckCheck className="size-4 text-emerald-600" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="size-4" />
+                            Copy
+                          </>
+                        )}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
   );
 }
