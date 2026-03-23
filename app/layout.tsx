@@ -41,12 +41,12 @@ export default function RootLayout({
       )}
     >
       <body className="min-h-full flex flex-col">
-        <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
+        <header className="sticky top-0 z-50 border-b border-[var(--border-subtle)] bg-[var(--surface-card)]/80 backdrop-blur-md">
           <div className="mx-auto flex h-12 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-            <span className="font-heading text-base font-semibold tracking-tight">
+            <span className="font-heading text-base font-semibold tracking-tight text-[var(--text-primary)]">
               Draftly
             </span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[11px] text-[var(--text-tertiary)]">
               tweet automation
             </span>
           </div>

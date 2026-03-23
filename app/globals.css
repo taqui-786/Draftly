@@ -4,6 +4,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ========================================
+   DRAFTLY DESIGN SYSTEM
+   Tweet Automation with AI Magic
+   ======================================== */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -48,83 +53,232 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ========================================
+   DESIGN TOKENS - LIGHT MODE
+   ======================================== */
+
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.147 0.004 49.25);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.147 0.004 49.25);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.147 0.004 49.25);
-  --primary: oklch(0.508 0.118 165.612);
-  --primary-foreground: oklch(0.979 0.021 166.113);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.97 0.001 106.424);
-  --muted-foreground: oklch(0.553 0.013 58.071);
-  --accent: oklch(0.97 0.001 106.424);
-  --accent-foreground: oklch(0.216 0.006 56.043);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.923 0.003 48.717);
-  --input: oklch(0.923 0.003 48.717);
-  --ring: oklch(0.709 0.01 56.259);
-  --chart-1: oklch(0.869 0.005 56.366);
-  --chart-2: oklch(0.553 0.013 58.071);
-  --chart-3: oklch(0.444 0.011 73.639);
-  --chart-4: oklch(0.374 0.01 67.558);
-  --chart-5: oklch(0.268 0.007 34.298);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0.001 106.423);
-  --sidebar-foreground: oklch(0.147 0.004 49.25);
-  --sidebar-primary: oklch(0.596 0.145 163.225);
-  --sidebar-primary-foreground: oklch(0.979 0.021 166.113);
-  --sidebar-accent: oklch(0.97 0.001 106.424);
-  --sidebar-accent-foreground: oklch(0.216 0.006 56.043);
-  --sidebar-border: oklch(0.923 0.003 48.717);
-  --sidebar-ring: oklch(0.709 0.01 56.259);
+  /* ─────── Brand: Coral Magic ─────── */
+  /* Warm coral/amber - distinctive from generic AI blue/purple */
+  --brand-50: oklch(0.985 0.02 35);
+  --brand-100: oklch(0.95 0.05 35);
+  --brand-200: oklch(0.91 0.08 35);
+  --brand-300: oklch(0.85 0.12 35);
+  --brand-400: oklch(0.78 0.14 35);
+  --brand-500: oklch(0.72 0.16 35);
+  --brand-600: oklch(0.65 0.18 35);
+  --brand-700: oklch(0.55 0.20 35);
+  --brand-800: oklch(0.45 0.18 35);
+  --brand-900: oklch(0.35 0.15 35);
+
+  /* ─────── Surface: Warm Neutral ─────── */
+  /* Cream-warm white instead of sterile white */
+  --surface-bg: oklch(0.985 0.015 50);
+  --surface-card: oklch(0.98 0.01 55);
+  --surface-popover: oklch(0.99 0.008 55);
+  --surface-input: oklch(0.96 0.01 55);
+  --surface-muted: oklch(0.96 0.008 55);
+
+  /* ─────── Text: Warm Gray ─────── */
+  /* Slightly warm grays for reduced eye strain */
+  --text-primary: oklch(0.22 0.015 50);
+  --text-secondary: oklch(0.45 0.015 50);
+  --text-tertiary: oklch(0.6 0.012 50);
+  --text-inverse: oklch(0.98 0.008 50);
+
+  /* ─────── Semantic: Intent-Based ─────── */
+  --intent-primary: oklch(0.65 0.18 35);      /* Coral magic - main actions */
+  --intent-primary-hover: oklch(0.58 0.18 35);
+  --intent-success: oklch(0.45 0.12 150);     /* Fresh green - success states */
+  --intent-success-bg: oklch(0.96 0.02 150);
+  --intent-warning: oklch(0.65 0.15 45);     /* Amber - warnings */
+  --intent-warning-bg: oklch(0.97 0.02 45);
+  --intent-error: oklch(0.55 0.18 25);       /* Coral red - errors */
+  --intent-error-bg: oklch(0.96 0.02 25);
+  --intent-info: oklch(0.55 0.12 220);        /* Sky blue - info */
+
+  /* ─────── Borders: Subtle Warm ─────── */
+  --border-subtle: oklch(0.92 0.008 55);
+  --border-default: oklch(0.88 0.01 55);
+  --border-strong: oklch(0.78 0.015 50);
+
+  /* ─────── Shadows: Soft & Warm ─────── */
+  --shadow-sm: oklch(0.85 0.01 50 / 0.15);
+  --shadow-md: oklch(0.85 0.01 50 / 0.12);
+  --shadow-lg: oklch(0.85 0.01 50 / 0.08);
+  --shadow-glow: oklch(0.65 0.18 35 / 0.25);
+
+  /* ─────── Mapped to Shadcn Variables ─────── */
+  --background: var(--surface-bg);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-popover);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--intent-primary);
+  --primary-foreground: var(--text-inverse);
+  --secondary: var(--surface-muted);
+  --secondary-foreground: var(--text-secondary);
+  --muted: var(--surface-muted);
+  --muted-foreground: var(--text-tertiary);
+  --accent: var(--surface-muted);
+  --accent-foreground: var(--text-secondary);
+  --destructive: var(--intent-error);
+  --border: var(--border-subtle);
+  --input: var(--surface-input);
+  --ring: var(--intent-primary);
+
+  /* ─────── Radius: Modern Rounded ─────── */
+  --radius: 0.75rem;
+
+  /* ─────── Charts: Brand Gradient ─────── */
+  --chart-1: oklch(0.72 0.16 35);   /* Brand coral */
+  --chart-2: oklch(0.55 0.12 220); /* Info blue */
+  --chart-3: oklch(0.45 0.12 150); /* Success green */
+  --chart-4: oklch(0.65 0.15 45);  /* Warning amber */
+  --chart-5: oklch(0.5 0.1 280);   /* Purple accent */
+
+  /* ─────── Sidebar (if used later) ─────── */
+  --sidebar: oklch(0.98 0.01 55);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--intent-primary);
+  --sidebar-primary-foreground: var(--text-inverse);
+  --sidebar-accent: var(--surface-muted);
+  --sidebar-accent-foreground: var(--text-secondary);
+  --sidebar-border: var(--border-subtle);
+  --sidebar-ring: var(--intent-primary);
 }
 
+/* ========================================
+   DESIGN TOKENS - DARK MODE
+   ======================================== */
+
 .dark {
-  --background: oklch(0.147 0.004 49.25);
-  --foreground: oklch(0.985 0.001 106.423);
-  --card: oklch(0.216 0.006 56.043);
-  --card-foreground: oklch(0.985 0.001 106.423);
-  --popover: oklch(0.216 0.006 56.043);
-  --popover-foreground: oklch(0.985 0.001 106.423);
-  --primary: oklch(0.432 0.095 166.913);
-  --primary-foreground: oklch(0.979 0.021 166.113);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.268 0.007 34.298);
-  --muted-foreground: oklch(0.709 0.01 56.259);
-  --accent: oklch(0.268 0.007 34.298);
-  --accent-foreground: oklch(0.985 0.001 106.423);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.553 0.013 58.071);
-  --chart-1: oklch(0.869 0.005 56.366);
-  --chart-2: oklch(0.553 0.013 58.071);
-  --chart-3: oklch(0.444 0.011 73.639);
-  --chart-4: oklch(0.374 0.01 67.558);
-  --chart-5: oklch(0.268 0.007 34.298);
-  --sidebar: oklch(0.216 0.006 56.043);
-  --sidebar-foreground: oklch(0.985 0.001 106.423);
-  --sidebar-primary: oklch(0.696 0.17 162.48);
-  --sidebar-primary-foreground: oklch(0.262 0.051 172.552);
-  --sidebar-accent: oklch(0.268 0.007 34.298);
-  --sidebar-accent-foreground: oklch(0.985 0.001 106.423);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.553 0.013 58.071);
+  /* ─────── Surface: Deep Charcoal ─────── */
+  --surface-bg: oklch(0.12 0.015 260);
+  --surface-card: oklch(0.16 0.02 260);
+  --surface-popover: oklch(0.18 0.02 260);
+  --surface-input: oklch(0.2 0.02 260);
+  --surface-muted: oklch(0.22 0.02 260);
+
+  /* ─────── Text: Warm Off-White ─────── */
+  --text-primary: oklch(0.95 0.008 55);
+  --text-secondary: oklch(0.7 0.012 55);
+  --text-tertiary: oklch(0.5 0.01 55);
+  --text-inverse: oklch(0.15 0.015 260);
+
+  /* ─────── Borders: Muted ─────── */
+  --border-subtle: oklch(1 0 0 / 6%);
+  --border-default: oklch(1 0 0 / 12%);
+  --border-strong: oklch(1 0 0 / 20%);
+
+  /* ─────── Shadows: Deep ─────── */
+  --shadow-sm: oklch(0 0 0 / 0.3);
+  --shadow-md: oklch(0 0 0 / 0.25);
+  --shadow-lg: oklch(0 0 0 / 0.2);
+  --shadow-glow: oklch(0.72 0.16 35 / 0.3);
+
+  /* ─────── Semantic: Adjusted for Dark ─────── */
+  --intent-primary: oklch(0.72 0.16 35);
+  --intent-primary-hover: oklch(0.78 0.14 35);
+  --intent-success: oklch(0.6 0.12 150);
+  --intent-success-bg: oklch(0.25 0.04 150);
+  --intent-warning: oklch(0.72 0.14 45);
+  --intent-warning-bg: oklch(0.28 0.04 45);
+  --intent-error: oklch(0.65 0.16 25);
+  --intent-error-bg: oklch(0.28 0.04 25);
+  --intent-info: oklch(0.65 0.12 220);
+
+  /* ─────── Mapped to Shadcn Variables ─────── */
+  --background: var(--surface-bg);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-popover);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--intent-primary);
+  --primary-foreground: var(--text-inverse);
+  --secondary: var(--surface-muted);
+  --secondary-foreground: var(--text-secondary);
+  --muted: var(--surface-muted);
+  --muted-foreground: var(--text-tertiary);
+  --accent: var(--surface-muted);
+  --accent-foreground: var(--text-secondary);
+  --destructive: var(--intent-error);
+  --border: var(--border-subtle);
+  --input: var(--surface-input);
+  --ring: var(--intent-primary);
+
+  /* ─────── Sidebar Dark ─────── */
+  --sidebar: oklch(0.16 0.02 260);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--intent-primary);
+  --sidebar-primary-foreground: var(--text-inverse);
+  --sidebar-accent: var(--surface-muted);
+  --sidebar-accent-foreground: var(--text-secondary);
+  --sidebar-border: var(--border-subtle);
+  --sidebar-ring: var(--intent-primary);
 }
+
+/* ========================================
+   BASE LAYER
+   ======================================== */
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }
+}
+
+/* ========================================
+   CUSTOM COMPONENT STYLES
+   ======================================== */
+
+/* Glow effect for primary buttons */
+.btn-glow {
+  box-shadow: 0 0 20px var(--shadow-glow);
+  transition: box-shadow 0.2s ease;
+}
+
+.btn-glow:hover {
+  box-shadow: 0 0 30px var(--shadow-glow);
+}
+
+/* Card glass effect */
+.card-glass {
+  background: var(--surface-card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Subtle gradient background */
+.bg-gradient-magic {
+  background: 
+    radial-gradient(ellipse 100% 80% at 50% 0%, oklch(0.97 0.03 35) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 100% 100%, oklch(0.95 0.04 90) 0%, transparent 55%),
+    var(--surface-bg);
+}
+
+/* Animation for sparkle elements */
+@keyframes sparkle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+.animate-sparkle {
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+/* Focus ring with brand color */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--surface-bg), 0 0 0 4px var(--intent-primary);
 }

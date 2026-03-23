@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { DEFAULT_RSS_FEEDS } from "@/lib/defaults";
 import type { ScrapedCandidate } from "@/lib/rss";
@@ -309,4 +309,60 @@ export async function attachSourcesToRun(runId: string, sourceIds: string[]) {
       lastGeneratedAt: new Date(),
     })
     .where(inArray(scrapedSources.id, sourceIds));
+}
+
+export type TweetHistoryItem = {
+  id: string;
+  runId: string;
+  text: string;
+  rationale: string;
+  charCount: number;
+  sourceType: "manual" | "rss";
+  sourcePrompt: string;
+  feedName?: string;
+  createdAt: Date;
+};
+
+export async function getTweetHistory(visitorId: string, limit = 10, offset = 0): Promise<TweetHistoryItem[]> {
+  const results = await db
+    .select({
+      tweetId: generatedTweets.id,
+      runId: generationRuns.id,
+      text: generatedTweets.text,
+      rationale: generatedTweets.rationale,
+      charCount: generatedTweets.charCount,
+      sourceType: generationRuns.sourceType,
+      sourcePrompt: generationRuns.sourcePrompt,
+      feedName: rssFeeds.name,
+      createdAt: generatedTweets.createdAt,
+    })
+    .from(generatedTweets)
+    .leftJoin(generationRuns, eq(generatedTweets.runId, generationRuns.id))
+    .leftJoin(rssFeeds, eq(generationRuns.feedId, rssFeeds.id))
+    .where(eq(generationRuns.visitorId, visitorId))
+    .orderBy(desc(generatedTweets.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return results.map((r): TweetHistoryItem => ({
+    id: r.tweetId,
+    runId: r.runId ?? "",
+    text: r.text,
+    rationale: r.rationale,
+    charCount: r.charCount,
+    sourceType: (r.sourceType as "manual" | "rss") ?? "manual",
+    sourcePrompt: r.sourcePrompt ?? "",
+    feedName: r.feedName ?? undefined,
+    createdAt: r.createdAt,
+  }));
+}
+
+export async function getTweetHistoryCount(visitorId: string): Promise<number> {
+  const [result] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(generatedTweets)
+    .leftJoin(generationRuns, eq(generatedTweets.runId, generationRuns.id))
+    .where(eq(generationRuns.visitorId, visitorId));
+
+  return result?.count ?? 0;
 }
