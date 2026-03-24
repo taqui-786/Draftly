@@ -7,7 +7,7 @@ import { getOrCreateVisitorId } from "@/lib/visitor-session";
 export const maxDuration = 30;
 
 const requestSchema = z.object({
-  prompt: z.string().trim().min(5).max(1200),
+  prompt: z.string().trim().min(5).max(3000),
   styleSample: z
     .array(
       z.object({
