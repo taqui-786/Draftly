@@ -7,6 +7,8 @@ import {
   type StyleTweet,
   validateTweetStyleFormat,
 } from "@/lib/style-engine";
+import { mainModel } from "./ai";
+import { generateText } from "ai";
 
 const tweetSchema = z.object({
   text: z
@@ -23,10 +25,21 @@ const tweetSchema = z.object({
     .describe("One short sentence describing why this angle differs."),
 });
 
+// Lenient schema for raw AI output — allows longer text that we truncate later
+const rawTweetSchema = z.object({
+  text: z.string().trim().min(1),
+  rationale: z.string().trim().min(1),
+});
+
+const rawOutputSchema = z.object({
+  tweets: z.array(rawTweetSchema).length(3),
+});
+
 const outputSchema = z.object({
   tweets: z.array(tweetSchema).length(3),
 });
 
+type RawTweetOutput = z.infer<typeof rawOutputSchema>;
 type TweetOutput = z.infer<typeof outputSchema>;
 
 export type GeneratedTweetDraft = {
@@ -36,52 +49,70 @@ export type GeneratedTweetDraft = {
   charCount: number;
 };
 
-const NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
-export const ACTIVE_MODEL = process.env.AI_MODEL ?? "meta/llama-3.1-70b-instruct";
+
 const MAX_ATTEMPTS = 3;
 
 const JSON_SYSTEM_PROMPT = `You are a tweet writing assistant. Always respond with ONLY a valid JSON object — no markdown, no extra text — matching this schema exactly:
 {"tweets":[{"text":"<tweet text>","rationale":"<one sentence rationale>"},{"text":"...","rationale":"..."},{"text":"...","rationale":"..."}]}`;
 
-async function callNvidiaAPI(userPrompt: string): Promise<TweetOutput> {
+function truncateTweet(text: string, maxLength = 280): string {
+  if (text.length <= maxLength) return text;
+  // Try to truncate at the last word boundary before the limit
+  const truncated = text.slice(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(' ');
+  const lastNewline = truncated.lastIndexOf('\n');
+  const breakPoint = Math.max(lastSpace, lastNewline);
+  return breakPoint > maxLength * 0.6 ? truncated.slice(0, breakPoint).trimEnd() : truncated.trimEnd();
+}
+
+async function callNvidiaAPI(userPrompt: string): Promise<RawTweetOutput> {
   const apiKey = process.env.AI_GATEWAY_API_KEY;
   if (!apiKey) throw new Error("AI_GATEWAY_API_KEY is not set.");
 
-  const response = await fetch(NVIDIA_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      model: ACTIVE_MODEL,
-      messages: [
-        { role: "system", content: JSON_SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
-      max_tokens: 900,
-      temperature: 0.7,
-      top_p: 0.95,
-    }),
-  });
+  // const response = await fetch(NVIDIA_API_URL, {
+  //   method: "POST",
+  //   headers: {
+  //     Authorization: `Bearer ${apiKey}`,
+  //     "Content-Type": "application/json",
+  //     Accept: "application/json",
+  //   },
+  //   body: JSON.stringify({
+  //     model: ACTIVE_MODEL,
+  //     messages: [
+  //       { role: "system", content: JSON_SYSTEM_PROMPT },
+  //       { role: "user", content: userPrompt },
+  //     ],
+  //     max_tokens: 2000,
+  //     temperature: 0.7,
+  //     top_p: 0.95,
+  //   }),
+  // });
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`NVIDIA API error ${response.status}: ${body}`);
-  }
+  // if (!response.ok) {
+  //   const body = await response.text();
+  //   throw new Error(`NVIDIA API error ${response.status}: ${body}`);
+  // }
 
-  const data = await response.json() as {
-    choices: Array<{ message: { content: string } }>;
-  };
-
-  const content = data.choices?.[0]?.message?.content ?? "";
+  // const data = await response.json() as {
+  //   choices: Array<{ message: { content: string } }>;
+  // };
+const response = await generateText({
+  model: mainModel,
+  system: JSON_SYSTEM_PROMPT,
+prompt:userPrompt,
+  
+  temperature: 0.7,
+  topP: 0.95,
+  
+  
+});
+  const content = response.text;
 
   // Strip any markdown code fences the model might add
   const cleaned = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 
   const parsed = JSON.parse(cleaned) as unknown;
-  return outputSchema.parse(parsed);
+  return rawOutputSchema.parse(parsed);
 }
 
 export async function generateTweetsWithRetry(prompt: string, styleSample: StyleTweet[]) {
@@ -103,7 +134,8 @@ export async function generateTweetsWithRetry(prompt: string, styleSample: Style
       const repairedOutput: TweetOutput = {
         tweets: raw.tweets.map((tweet) => ({
           ...tweet,
-          text: repairTweetFormatting(tweet.text, styleProfile),
+          text: truncateTweet(repairTweetFormatting(tweet.text, styleProfile)),
+          rationale: tweet.rationale.slice(0, 160),
         })),
       };
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { normalizeStyleSample } from "@/lib/style-engine";
 import { buildRssPrompt, fetchRssEntries, prepareScrapeCandidates } from "@/lib/rss";
-import { ACTIVE_MODEL, generateTweetsWithRetry } from "@/lib/tweet-generator";
+import {  generateTweetsWithRetry } from "@/lib/tweet-generator";
 import {
   attachSourcesToRun,
   createGenerationRun,
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
       sourceType: "rss",
       sourcePrompt: requestPrompt,
       feedId: feed.id,
-      model: ACTIVE_MODEL,
+      model: 'taqui',
       metadata: {
         feedName: feed.name,
         sourceCount: selectedSources.length,

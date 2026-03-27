@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.47",
+    "@ai-sdk/openai-compatible": "^2.0.37",
     "@ai-sdk/react": "^3.0.118",
     "@neondatabase/serverless": "^1.0.2",
     "ai": "^6.0.116",

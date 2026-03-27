@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { normalizeStyleSample } from "@/lib/style-engine";
-import { ACTIVE_MODEL, generateTweetsWithRetry } from "@/lib/tweet-generator";
+import {  generateTweetsWithRetry } from "@/lib/tweet-generator";
 import { createGenerationRun, getOrCreateStyleProfile, persistGeneratedTweets } from "@/lib/storage";
 import { getOrCreateVisitorId } from "@/lib/visitor-session";
 
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
       visitorId,
       sourceType: "manual",
       sourcePrompt: parsed.data.prompt,
-      model: ACTIVE_MODEL,
+      model: 'qwen/qwen3-coder-30b-a3b-instruct',
       metadata: {
         styleProfileId: styleProfile.id,
       },
