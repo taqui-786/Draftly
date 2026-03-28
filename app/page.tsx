@@ -34,6 +34,7 @@ type FeedEntry = {
   link: string;
   decodedUrl?: string;
   canonicalUrl?: string;
+  officialTweetUrl?: string | null;
   publishedAt: string;
   summary: string;
   relevanceScore?: number;
@@ -612,6 +613,11 @@ export default function Page() {
                         {entry.canonicalUrl && (
                           <p className="mt-1 truncate text-[11px] text-muted-foreground">
                             Canonical: {entry.canonicalUrl}
+                          </p>
+                        )}
+                        {entry.officialTweetUrl && (
+                          <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                            Official tweet: {entry.officialTweetUrl}
                           </p>
                         )}
                       </a>

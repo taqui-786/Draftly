@@ -6,6 +6,7 @@ export type FeedEntry = {
   link: string;
   publishedAt: string;
   summary: string;
+  rawSummary?: string;
 };
 
 export type ScrapedCandidate = FeedEntry & {
@@ -16,6 +17,7 @@ export type ScrapedCandidate = FeedEntry & {
   nicheTopics: string[];
   relevanceScore: number;
   publishedAtDate: Date | null;
+  officialTweetUrl: string | null;
 };
 
 const parser = new XMLParser({
@@ -59,6 +61,19 @@ function stripHtml(value: string | undefined) {
     return "";
   }
   return normalizeWhitespace(value.replace(/<[^>]*>/g, " "));
+}
+
+function stripHtmlPreservingLinks(value: string | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  const withHrefTargets = value.replace(
+    /<a\b[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gis,
+    (_match, href: string, text: string) => ` ${text || ""} ${href} `,
+  );
+
+  return stripHtml(withHrefTargets);
 }
 
 function parsePublishedAt(value: string): Date | null {
@@ -142,6 +157,58 @@ export function canonicalizeUrl(rawUrl: string): string {
   }
 }
 
+function extractUrls(value: string) {
+  return value.match(/https?:\/\/[^\s<>"')\]]+/gi) ?? [];
+}
+
+function normalizeTweetStatusUrl(rawUrl: string): string | null {
+  const decoded = decodeActualResourceUrl(rawUrl);
+  let parsed: URL;
+  try {
+    parsed = new URL(decoded);
+  } catch {
+    return null;
+  }
+
+  const hostname = parsed.hostname.replace(/^www\./, "").toLowerCase();
+  const isXHost = hostname === "x.com" || hostname === "twitter.com";
+  if (!isXHost) {
+    return null;
+  }
+
+  const path = parsed.pathname.replace(/\/+$/, "");
+  if (!/\/status\/\d+$/i.test(path)) {
+    return null;
+  }
+
+  return `https://${hostname}${path}`;
+}
+
+export function extractOfficialTweetUrl(input: {
+  sourceUrl?: string;
+  decodedUrl?: string;
+  canonicalUrl?: string;
+  rawSummary?: string;
+  summary?: string;
+}): string | null {
+  const candidates = [
+    input.sourceUrl,
+    input.decodedUrl,
+    input.canonicalUrl,
+    ...(input.rawSummary ? extractUrls(input.rawSummary) : []),
+    ...(input.summary ? extractUrls(input.summary) : []),
+  ].filter((value): value is string => Boolean(value));
+
+  for (const candidate of candidates) {
+    const normalizedTweet = normalizeTweetStatusUrl(candidate);
+    if (normalizedTweet) {
+      return normalizedTweet;
+    }
+  }
+
+  return null;
+}
+
 function hashValue(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -206,7 +273,7 @@ export async function fetchRssEntries(url: string, limit = 12): Promise<FeedEntr
         publishedAt: String(
           objectItem.pubDate ?? objectItem.published ?? objectItem.updated ?? "",
         ).trim(),
-        summary: stripHtml(
+        summary: stripHtmlPreservingLinks(
           String(
             objectItem.description ??
               objectItem.summary ??
@@ -214,6 +281,13 @@ export async function fetchRssEntries(url: string, limit = 12): Promise<FeedEntr
               objectItem.content ??
               "",
           ),
+        ),
+        rawSummary: String(
+          objectItem.description ??
+            objectItem.summary ??
+            objectItem["content:encoded"] ??
+            objectItem.content ??
+            "",
         ),
       } satisfies FeedEntry;
     })
@@ -232,6 +306,13 @@ export function prepareScrapeCandidates(entries: FeedEntry[]) {
     const summary = entry.summary.slice(0, 800);
     const contentHash = hashValue(`${entry.title.toLowerCase()}|${summary.toLowerCase()}`);
     const niche = scoreNicheRelevance(entry.title, summary);
+    const officialTweetUrl = extractOfficialTweetUrl({
+      sourceUrl: entry.link,
+      decodedUrl,
+      canonicalUrl,
+      summary,
+      rawSummary: entry.rawSummary,
+    });
 
     if (!niche.isRelevant) {
       continue;
@@ -253,6 +334,7 @@ export function prepareScrapeCandidates(entries: FeedEntry[]) {
       nicheTopics: niche.topics,
       relevanceScore: niche.score,
       publishedAtDate: parsePublishedAt(entry.publishedAt),
+      officialTweetUrl,
     });
   }
 
@@ -266,6 +348,7 @@ export function buildRssPrompt(feedName: string, entries: ScrapedCandidate[]) {
       return `${index + 1}. ${entry.title}
 Published: ${entry.publishedAt || "Unknown"}
 Canonical URL: ${entry.canonicalUrl}
+Official Tweet URL: ${entry.officialTweetUrl || "Not found"}
 Topics: ${entry.nicheTopics.join(", ")}
 Summary: ${shortSummary || "No summary provided"}`;
     })
@@ -275,6 +358,7 @@ Summary: ${shortSummary || "No summary provided"}`;
 Focus only on software, software generation, website building, design/UI-UX, fullstack/web-dev job market, AI-and-jobs, and Claude/Anthropic updates.
 Keep each draft factual and avoid inventing details.
 Use one clear idea per tweet and make it skimmable.
+When an "Official Tweet URL" is provided, include that exact URL in the tweet draft so it can be posted as a quote-tweet reference.
 
 Feed context:
 ${bullets}`;

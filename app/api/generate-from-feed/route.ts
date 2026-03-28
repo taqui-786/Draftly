@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { normalizeStyleSample } from "@/lib/style-engine";
-import { buildRssPrompt, fetchRssEntries, prepareScrapeCandidates } from "@/lib/rss";
+import {
+  buildRssPrompt,
+  extractOfficialTweetUrl,
+  fetchRssEntries,
+  prepareScrapeCandidates,
+} from "@/lib/rss";
 import {  generateTweetsWithRetry } from "@/lib/tweet-generator";
 import {
   attachSourcesToRun,
@@ -68,19 +73,29 @@ export async function POST(req: Request) {
       );
     }
 
-    const promptEntries = selectedSources.map((source) => ({
-      title: source.title,
-      link: source.sourceUrl,
-      publishedAt: source.publishedAt?.toISOString() ?? "",
-      summary: source.summary,
-      decodedUrl: source.decodedUrl,
-      canonicalUrl: source.canonicalUrl,
-      urlHash: source.urlHash,
-      contentHash: source.contentHash,
-      nicheTopics: source.nicheTopics,
-      relevanceScore: source.relevanceScore,
-      publishedAtDate: source.publishedAt,
-    }));
+    const promptEntries = selectedSources.map((source) => {
+      const officialTweetUrl = extractOfficialTweetUrl({
+        sourceUrl: source.sourceUrl,
+        decodedUrl: source.decodedUrl,
+        canonicalUrl: source.canonicalUrl,
+        summary: source.summary,
+      });
+
+      return {
+        title: source.title,
+        link: source.sourceUrl,
+        publishedAt: source.publishedAt?.toISOString() ?? "",
+        summary: source.summary,
+        decodedUrl: source.decodedUrl,
+        canonicalUrl: source.canonicalUrl,
+        urlHash: source.urlHash,
+        contentHash: source.contentHash,
+        nicheTopics: source.nicheTopics,
+        relevanceScore: source.relevanceScore,
+        publishedAtDate: source.publishedAt,
+        officialTweetUrl,
+      };
+    });
 
     const requestPrompt = buildRssPrompt(feed.name, promptEntries);
     const tweets = await generateTweetsWithRetry(
@@ -120,6 +135,12 @@ export async function POST(req: Request) {
         link: source.sourceUrl,
         decodedUrl: source.decodedUrl,
         canonicalUrl: source.canonicalUrl,
+        officialTweetUrl: extractOfficialTweetUrl({
+          sourceUrl: source.sourceUrl,
+          decodedUrl: source.decodedUrl,
+          canonicalUrl: source.canonicalUrl,
+          summary: source.summary,
+        }),
         publishedAt: source.publishedAt?.toISOString() ?? "",
         summary: source.summary,
         relevanceScore: source.relevanceScore,
