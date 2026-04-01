@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { addFeed, listActiveFeeds } from "@/lib/storage";
+import { addFeed, deleteFeed, listActiveFeeds } from "@/lib/storage";
 
 const addFeedSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -31,5 +31,25 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("Feed creation failed:", error);
     return Response.json({ error: "Failed to save feed." }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const feedId = searchParams.get("id");
+
+  if (!feedId) {
+    return Response.json({ error: "Feed ID is required." }, { status: 400 });
+  }
+
+  try {
+    const deleted = await deleteFeed(feedId);
+    if (!deleted) {
+      return Response.json({ error: "Feed not found." }, { status: 404 });
+    }
+    return Response.json({ message: "Feed removed." });
+  } catch (error) {
+    console.error("Feed deletion failed:", error);
+    return Response.json({ error: "Failed to remove feed." }, { status: 500 });
   }
 }

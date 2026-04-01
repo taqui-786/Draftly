@@ -69,7 +69,7 @@ function stripHtmlPreservingLinks(value: string | undefined) {
   }
 
   const withHrefTargets = value.replace(
-    /<a\b[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gis,
+    /<a\b[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi,
     (_match, href: string, text: string) => ` ${text || ""} ${href} `,
   );
 

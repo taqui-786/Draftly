@@ -94,6 +94,15 @@ export async function ensureDefaultFeeds() {
     .onConflictDoNothing({ target: rssFeeds.id });
 }
 
+export async function deleteFeed(feedId: string) {
+  const result = await db
+    .update(rssFeeds)
+    .set({ isActive: false })
+    .where(eq(rssFeeds.id, feedId))
+    .returning();
+  return result[0] ?? null;
+}
+
 export async function listActiveFeeds() {
   await ensureDefaultFeeds();
   return db
@@ -365,4 +374,100 @@ export async function getTweetHistoryCount(visitorId: string): Promise<number> {
     .where(eq(generationRuns.visitorId, visitorId));
 
   return result?.count ?? 0;
+}
+
+export type AnalyticsData = {
+  totalTweets: number;
+  totalRuns: number;
+  manualTweets: number;
+  rssTweets: number;
+  topFeeds: { name: string; count: number }[];
+  recentActivity: { date: string; count: number }[];
+  trendingTopics: string[];
+};
+
+export async function getAnalytics(visitorId: string): Promise<AnalyticsData> {
+  const [totalTweetsResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(generatedTweets)
+    .leftJoin(generationRuns, eq(generatedTweets.runId, generationRuns.id))
+    .where(eq(generationRuns.visitorId, visitorId));
+
+  const [totalRunsResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(generationRuns)
+    .where(eq(generationRuns.visitorId, visitorId));
+
+  const [manualResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(generatedTweets)
+    .leftJoin(generationRuns, eq(generatedTweets.runId, generationRuns.id))
+    .where(eq(generationRuns.visitorId, visitorId) && eq(generationRuns.sourceType, "manual"));
+
+  const [rssResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(generatedTweets)
+    .leftJoin(generationRuns, eq(generatedTweets.runId, generationRuns.id))
+    .where(eq(generationRuns.visitorId, visitorId) && eq(generationRuns.sourceType, "rss"));
+
+  const feedRuns = await db
+    .select({ feedName: rssFeeds.name, count: sql<number>`count(*)` })
+    .from(generationRuns)
+    .leftJoin(rssFeeds, eq(generationRuns.feedId, rssFeeds.id))
+    .where(eq(generationRuns.visitorId, visitorId) && eq(generationRuns.sourceType, "rss"))
+    .groupBy(rssFeeds.name)
+    .orderBy(sql`count(*) DESC`)
+    .limit(5);
+
+  const recentActivity = await db
+    .select({
+      date: sql<string>`DATE(${generationRuns.createdAt})`,
+      count: sql<number>`count(*)`,
+    })
+    .from(generationRuns)
+    .where(
+      and(
+        eq(generationRuns.visitorId, visitorId),
+        sql`${generationRuns.createdAt} > NOW() - INTERVAL '30 days'`,
+      ),
+    )
+    .groupBy(sql`DATE(${generationRuns.createdAt})`)
+    .orderBy(sql`DATE(${generationRuns.createdAt}) DESC`)
+    .limit(14);
+
+  const recentRuns = await db
+    .select({ sourcePrompt: generationRuns.sourcePrompt })
+    .from(generationRuns)
+    .where(
+      and(
+        eq(generationRuns.visitorId, visitorId),
+        sql`${generationRuns.createdAt} > NOW() - INTERVAL '7 days'`,
+      ),
+    )
+    .limit(50);
+
+  const topicFrequency = new Map<string, number>();
+  recentRuns.forEach((run) => {
+    const words = run.sourcePrompt.toLowerCase().split(/\s+/);
+    words.forEach((word) => {
+      if (word.length > 4) {
+        topicFrequency.set(word, (topicFrequency.get(word) ?? 0) + 1);
+      }
+    });
+  });
+
+  const trendingTopics = [...topicFrequency.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([topic]) => topic);
+
+  return {
+    totalTweets: totalTweetsResult?.count ?? 0,
+    totalRuns: totalRunsResult?.count ?? 0,
+    manualTweets: manualResult?.count ?? 0,
+    rssTweets: rssResult?.count ?? 0,
+    topFeeds: feedRuns.map((f) => ({ name: f.feedName ?? "Unknown", count: f.count })),
+    recentActivity: recentActivity.map((a) => ({ date: a.date, count: a.count })),
+    trendingTopics,
+  };
 }
